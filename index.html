@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Female Representation Checker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+</head>
+<body>
+
+<h2>Female Representation in Research Checker</h2>
+
+<input type="file" id="fileInput" accept=".pdf">
+<button onclick="checkPaper()">Check</button>
+
+<h3 id="result"></h3>
+
+<script>
+
+const REPRESENTATION_THRESHOLD = 45;
+
+// -------- PDF TEXT EXTRACTION --------
+async function extractTextFromPDF(file) {
+    const reader = new FileReader();
+
+    return new Promise((resolve, reject) => {
+        reader.onload = async function() {
+            const typedarray = new Uint8Array(this.result);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+
+            let fullText = "";
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(" ");
+                fullText += pageText + " ";
+            }
+
+            resolve(fullText.toLowerCase());
+        };
+
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// -------- PRIORITIZE METHODS SECTION --------
+function extractMethodsSection(text) {
+    const match = text.match(/(methodology|methods|procedure)([\s\S]{0,6000})/);
+    return match ? match[0] : null;
+}
+
+// -------- DETECT GENDER WORDS --------
+function detectGenderMention(text) {
+    return /women|woman|female|females|girls|men|man|male|males|boys/.test(text);
+}
+
+// -------- EXTRACT TOTAL PARTICIPANTS --------
+function extractTotal(text) {
+
+    let nMatch = text.match(/n\s*=\s*(\d+)/);
+    if (nMatch) return parseInt(nMatch[1]);
+
+    let totalMatch = text.match(/(\d+)\s*(participants|subjects|individuals)/);
+    if (totalMatch) return parseInt(totalMatch[1]);
+
+    return null;
+}
+
+// -------- EXTRACT FEMALE COUNT --------
+function extractFemaleCount(text) {
+
+    let femaleMatch = text.match(/(\d+)\s*(women|woman|female|females|girls)/);
+    if (femaleMatch) return parseInt(femaleMatch[1]);
+
+    return null;
+}
+
+// -------- EXTRACT FEMALE PERCENT DIRECTLY --------
+function extractFemalePercent(text) {
+    let percentMatch = text.match(/(\d+)\s*%\s*(female|women|girls)/);
+    if (percentMatch) return parseFloat(percentMatch[1]);
+
+    return null;
+}
+
+// -------- ANALYSIS FUNCTION --------
+function analyzeText(text) {
+
+    const total = extractTotal(text);
+    const femaleCount = extractFemaleCount(text);
+    const directPercent = extractFemalePercent(text);
+    const genderMentioned = detectGenderMention(text);
+
+    let femalePercentage = null;
+
+    if (directPercent !== null) {
+        femalePercentage = directPercent;
+    } 
+    else if (total !== null && femaleCount !== null) {
+        femalePercentage = (femaleCount / total) * 100;
+    }
+
+    return {
+        femalePercentage,
+        genderMentioned
+    };
+}
+
+// -------- MAIN CHECK FUNCTION --------
+async function checkPaper() {
+
+    const fileInput = document.getElementById("fileInput");
+    const result = document.getElementById("result");
+
+    if (!fileInput.files.length) {
+        result.innerText = "Please upload a PDF file.";
+        return;
+    }
+
+    result.innerText = "Analyzing paper...";
+
+    const fullText = await extractTextFromPDF(fileInput.files[0]);
+
+    // Step 1: Analyze Methods section first
+    const methodsSection = extractMethodsSection(fullText);
+    let analysis = methodsSection ? analyzeText(methodsSection) : null;
+
+    // Step 2: Fallback to whole paper if needed
+    if (!analysis || analysis.femalePercentage === null) {
+        analysis = analyzeText(fullText);
+    }
+
+    // -------- FINAL OUTPUT LOGIC --------
+
+    // Case 1: Percentage detected
+    if (analysis.femalePercentage !== null) {
+
+        const percentage = analysis.femalePercentage.toFixed(2);
+        const status = analysis.femalePercentage >= REPRESENTATION_THRESHOLD
+            ? "Accurate Representation ✅"
+            : "Underrepresentation ❌";
+
+        result.innerText =
+            "Female Representation: " + percentage + "%\n" +
+            status;
+    }
+
+    // Case 2: Gender mentioned but no numbers
+    else if (analysis.genderMentioned) {
+
+        result.innerText =
+            "Number of females in study not specified.";
+    }
+
+    // Case 3: No gender mentioned at all
+    else {
+
+        result.innerText =
+            "Female representation not specified in this paper.";
+    }
+}
+
+</script>
+
+</body>
+</html>
