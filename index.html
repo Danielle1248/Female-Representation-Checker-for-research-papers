@@ -156,6 +156,16 @@ async function checkPaper() {
     const fileInput = document.getElementById("fileInput");
     const result = document.getElementById("result");
 
+// Reset previous chart
+if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+}
+
+// Hide chart until needed
+document.getElementById("resultChart").style.display = "none";
+
+
     if (!fileInput.files.length) {
         result.innerText = "Please upload a PDF file.";
         return;
@@ -186,6 +196,7 @@ async function checkPaper() {
 
         const maleCount = totalParticipants - femaleCount;
 
+document.getElementById("resultChart").style.display = "block";
         renderChart(femaleCount, maleCount);
 
         const status = analysis.femalePercentage >= REPRESENTATION_THRESHOLD
