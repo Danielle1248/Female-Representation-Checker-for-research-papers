@@ -2,76 +2,73 @@
 <html>
 <head>
     <title>Female Representation Checker</title>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
-<!-- Website design start -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            text-align: center;
+            padding: 50px;
+        }
 
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        background-color: #f4f6f9;
-        text-align: center;
-        padding: 50px;
-    }
+        h2 {
+            color: #333;
+            margin-bottom: 30px;
+        }
 
-    h1 {
-        color: #333;
-        margin-bottom: 30px;
-    }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
 
-    button {
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        font-size: 16px;
-        border-radius: 8px;
-        cursor: pointer;
-    }
+        button:hover {
+            background-color: #45a049;
+        }
 
-    button:hover {
-        background-color: #45a049;
-    }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            width: 300px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
 
-    input {
-        padding: 10px;
-        font-size: 16px;
-        width: 300px;
-        margin-bottom: 20px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-    }
-</style>
-
-<!-- Website design end -->
-
-<!-- pie chart start -->
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-
-<!-- pie chart end -->
-
+        canvas {
+            margin-top: 30px;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
 </head>
+
 <body>
 
 <h2>Female Representation in Research Checker</h2>
 
 <input type="file" id="fileInput" accept=".pdf">
+<br><br>
 <button onclick="checkPaper()">Check</button>
 
 <h3 id="result"></h3>
 
-<canvas id="resultChart" 
-        style="margin-top:30px; max-width:400px; margin-left:auto; margin-right:auto;">
-</canvas>
-
+<canvas id="resultChart"></canvas>
 
 <script>
 
 const REPRESENTATION_THRESHOLD = 45;
+let chartInstance = null;
 
-// -------- PDF TEXT EXTRACTION --------
 async function extractTextFromPDF(file) {
     const reader = new FileReader();
 
@@ -97,20 +94,16 @@ async function extractTextFromPDF(file) {
     });
 }
 
-// -------- PRIORITIZE METHODS SECTION --------
 function extractMethodsSection(text) {
     const match = text.match(/(methodology|methods|procedure)([\s\S]{0,6000})/);
     return match ? match[0] : null;
 }
 
-// -------- DETECT GENDER WORDS --------
 function detectGenderMention(text) {
     return /women|woman|female|females|girls|men|man|male|males|boys/.test(text);
 }
 
-// -------- EXTRACT TOTAL PARTICIPANTS --------
 function extractTotal(text) {
-
     let nMatch = text.match(/n\s*=\s*(\d+)/);
     if (nMatch) return parseInt(nMatch[1]);
 
@@ -120,16 +113,13 @@ function extractTotal(text) {
     return null;
 }
 
-// -------- EXTRACT FEMALE COUNT --------
 function extractFemaleCount(text) {
-
     let femaleMatch = text.match(/(\d+)\s*(women|woman|female|females|girls)/);
     if (femaleMatch) return parseInt(femaleMatch[1]);
 
     return null;
 }
 
-// -------- EXTRACT FEMALE PERCENT DIRECTLY --------
 function extractFemalePercent(text) {
     let percentMatch = text.match(/(\d+)\s*%\s*(female|women|girls)/);
     if (percentMatch) return parseFloat(percentMatch[1]);
@@ -137,7 +127,6 @@ function extractFemalePercent(text) {
     return null;
 }
 
-// -------- ANALYSIS FUNCTION --------
 function analyzeText(text) {
 
     const total = extractTotal(text);
@@ -155,15 +144,13 @@ function analyzeText(text) {
     }
 
     return {
-    femalePercentage,
-    genderMentioned,
-    totalParticipants: total,
-    femaleCount: femaleCount
-};
-
+        femalePercentage,
+        genderMentioned,
+        totalParticipants: total,
+        femaleCount: femaleCount
+    };
 }
 
-// -------- MAIN CHECK FUNCTION --------
 async function checkPaper() {
 
     const fileInput = document.getElementById("fileInput");
@@ -177,36 +164,29 @@ async function checkPaper() {
     result.innerText = "Analyzing paper...";
 
     const fullText = await extractTextFromPDF(fileInput.files[0]);
-
-    // Step 1: Analyze Methods section first
     const methodsSection = extractMethodsSection(fullText);
+
     let analysis = methodsSection ? analyzeText(methodsSection) : null;
 
-    // Step 2: Fallback to whole paper if needed
     if (!analysis || analysis.femalePercentage === null) {
         analysis = analyzeText(fullText);
     }
-
-    // -------- FINAL OUTPUT LOGIC --------
-
-    // Case 1: Percentage detected
     if (analysis.femalePercentage !== null) {
 
         const percentage = analysis.femalePercentage.toFixed(2);
+        const totalParticipants = analysis.totalParticipants;
 
-const femaleCount = analysis.femaleCount;
-const totalParticipants = analysis.totalParticipants;
-const maleCount = totalParticipants - femaleCount;
+        let femaleCount;
 
-renderChart(femaleCount, maleCount);
+        if (analysis.femaleCount !== null) {
+            femaleCount = analysis.femaleCount;
+        } else {
+            femaleCount = Math.round((analysis.femalePercentage / 100) * totalParticipants);
+        }
 
+        const maleCount = totalParticipants - femaleCount;
 
-const totalParticipants = analysis.totalParticipants;
-const femaleCount = Math.round((analysis.femalePercentage / 100) * totalParticipants);
-const maleCount = totalParticipants - femaleCount;
-
-renderChart(femaleCount, maleCount);
-
+        renderChart(femaleCount, maleCount);
 
         const status = analysis.femalePercentage >= REPRESENTATION_THRESHOLD
             ? "Accurate Representation ✅"
@@ -217,33 +197,21 @@ renderChart(femaleCount, maleCount);
             status;
     }
 
-    // Case 2: Gender mentioned but no numbers
     else if (analysis.genderMentioned) {
-
-        result.innerText =
-            "Number of females in study not specified.";
+        result.innerText = "Number of females in study not specified.";
     }
 
-    // Case 3: No gender mentioned at all
     else {
-
-        result.innerText =
-            "Female representation not specified in this paper.";
+        result.innerText = "Female representation not specified in this paper.";
     }
 }
 
-let chartInstance = null;
-
+// -------- RENDER PIE CHART --------
 function renderChart(femaleCount, maleCount) {
 
     const ctx = document.getElementById('resultChart').getContext('2d');
-
     const total = femaleCount + maleCount;
 
-    const femalePercentage = ((femaleCount / total) * 100).toFixed(1);
-    const malePercentage = ((maleCount / total) * 100).toFixed(1);
-
-    // Destroy old chart if it exists
     if (chartInstance) {
         chartInstance.destroy();
     }
@@ -251,16 +219,10 @@ function renderChart(femaleCount, maleCount) {
     chartInstance = new Chart(ctx, {
         type: 'pie',
         data: {
-            labels: [
-                'Biologically Female',
-                'Biologically Male'
-            ],
+            labels: ['Biologically Female', 'Biologically Male'],
             datasets: [{
                 data: [femaleCount, maleCount],
-                backgroundColor: [
-                    '#2196F3',  // Blue (Female)
-                    '#F44336'   // Red (Male)
-                ]
+                backgroundColor: ['#2196F3', '#F44336']
             }]
         },
         options: {
@@ -283,7 +245,6 @@ function renderChart(femaleCount, maleCount) {
         plugins: [ChartDataLabels]
     });
 }
-
 
 </script>
 
