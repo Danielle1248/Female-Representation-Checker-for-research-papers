@@ -45,6 +45,13 @@
 
 <!-- Website design end -->
 
+<!-- pie chart start -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+<!-- pie chart end -->
+
 </head>
 <body>
 
@@ -54,6 +61,11 @@
 <button onclick="checkPaper()">Check</button>
 
 <h3 id="result"></h3>
+
+<canvas id="resultChart" 
+        style="margin-top:30px; max-width:400px; margin-left:auto; margin-right:auto;">
+</canvas>
+
 
 <script>
 
@@ -143,9 +155,12 @@ function analyzeText(text) {
     }
 
     return {
-        femalePercentage,
-        genderMentioned
-    };
+    femalePercentage,
+    genderMentioned,
+    totalParticipants: total,
+    femaleCount: femaleCount
+};
+
 }
 
 // -------- MAIN CHECK FUNCTION --------
@@ -178,6 +193,21 @@ async function checkPaper() {
     if (analysis.femalePercentage !== null) {
 
         const percentage = analysis.femalePercentage.toFixed(2);
+
+const femaleCount = analysis.femaleCount;
+const totalParticipants = analysis.totalParticipants;
+const maleCount = totalParticipants - femaleCount;
+
+renderChart(femaleCount, maleCount);
+
+
+const totalParticipants = analysis.totalParticipants;
+const femaleCount = Math.round((analysis.femalePercentage / 100) * totalParticipants);
+const maleCount = totalParticipants - femaleCount;
+
+renderChart(femaleCount, maleCount);
+
+
         const status = analysis.femalePercentage >= REPRESENTATION_THRESHOLD
             ? "Accurate Representation ✅"
             : "Underrepresentation ❌";
@@ -201,6 +231,59 @@ async function checkPaper() {
             "Female representation not specified in this paper.";
     }
 }
+
+let chartInstance = null;
+
+function renderChart(femaleCount, maleCount) {
+
+    const ctx = document.getElementById('resultChart').getContext('2d');
+
+    const total = femaleCount + maleCount;
+
+    const femalePercentage = ((femaleCount / total) * 100).toFixed(1);
+    const malePercentage = ((maleCount / total) * 100).toFixed(1);
+
+    // Destroy old chart if it exists
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+
+    chartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: [
+                'Biologically Female',
+                'Biologically Male'
+            ],
+            datasets: [{
+                data: [femaleCount, maleCount],
+                backgroundColor: [
+                    '#2196F3',  // Blue (Female)
+                    '#F44336'   // Red (Male)
+                ]
+            }]
+        },
+        options: {
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                datalabels: {
+                    formatter: (value) => {
+                        let percentage = (value / total * 100).toFixed(1);
+                        return percentage + '%';
+                    },
+                    color: '#fff',
+                    font: {
+                        weight: 'bold'
+                    }
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+}
+
 
 </script>
 
