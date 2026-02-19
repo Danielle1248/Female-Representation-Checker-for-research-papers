@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Female Representation Checker</title>
+    <title>Female Representation Analysis Tool</title>
 
+    <!-- PDF.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
@@ -11,17 +14,71 @@
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f6f9;
-            text-align: center;
-            padding: 50px;
+            margin: 0;
         }
 
-        h2 {
+        /* Navigation */
+        .navbar {
+            background-color: white;
+            padding: 15px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            margin-left: 25px;
             color: #333;
-            margin-bottom: 30px;
+            font-weight: 500;
+        }
+
+        .nav-links a:hover {
+            color: #2196F3;
+        }
+
+        .active {
+            color: #2196F3;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 4px;
+        }
+
+        /* Main Layout */
+        .hero {
+            text-align: center;
+            margin-top: 60px;
+        }
+
+        .hero h1 {
+            margin-bottom: 10px;
+        }
+
+        .hero p {
+            color: #555;
+        }
+
+        .card {
+            max-width: 700px;
+            margin: 40px auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 18px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+
+        input {
+            padding: 10px;
+            font-size: 16px;
+            width: 70%;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
         }
 
         button {
-            background-color: #4CAF50;
+            background-color: #2196F3;
             color: white;
             border: none;
             padding: 12px 24px;
@@ -31,16 +88,7 @@
         }
 
         button:hover {
-            background-color: #45a049;
-        }
-
-        input {
-            padding: 10px;
-            font-size: 16px;
-            width: 300px;
-            margin-bottom: 20px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
+            background-color: #1976D2;
         }
 
         canvas {
@@ -48,123 +96,60 @@
             max-width: 400px;
             margin-left: auto;
             margin-right: auto;
+            display: none;
+        }
+
+        #result {
+            white-space: pre-line;
         }
     </style>
 </head>
 
 <body>
 
-<h2>Female Representation in Research Checker</h2>
+    <div class="navbar">
+        <div><strong>Reach Research Tool</strong></div>
+        <div class="nav-links">
+            <a href="index.html" class="active">Home</a>
+            <a href="about.html">About</a>
+            <a href="mission.html">Mission</a>
+        </div>
+    </div>
 
-<input type="file" id="fileInput" accept=".pdf">
-<br><br>
-<button onclick="checkPaper()">Check</button>
+    <div class="hero">
+        <h1>Female Representation Analysis Tool</h1>
+        <p>Evaluate biological sex representation in academic research papers.</p>
+    </div>
 
-<h3 id="result"></h3>
+    <div class="card">
+        <input type="file" id="fileInput" accept=".pdf"><br>
+        <button onclick="checkPaper()">Analyze Paper</button>
+    </div>
 
-<canvas id="resultChart"></canvas>
+    <div class="card">
+        <h3 id="result"></h3>
+        <canvas id="resultChart"></canvas>
+    </div>
 
 <script>
 
 const REPRESENTATION_THRESHOLD = 45;
 let chartInstance = null;
 
-async function extractTextFromPDF(file) {
-    const reader = new FileReader();
-
-    return new Promise((resolve, reject) => {
-        reader.onload = async function() {
-            const typedarray = new Uint8Array(this.result);
-            const pdf = await pdfjsLib.getDocument(typedarray).promise;
-
-            let fullText = "";
-
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join(" ");
-                fullText += pageText + " ";
-            }
-
-            resolve(fullText.toLowerCase());
-        };
-
-        reader.onerror = reject;
-        reader.readAsArrayBuffer(file);
-    });
-}
-
-function extractMethodsSection(text) {
-    const match = text.match(/(methodology|methods|procedure)([\s\S]{0,6000})/);
-    return match ? match[0] : null;
-}
-
-function detectGenderMention(text) {
-    return /women|woman|female|females|girls|men|man|male|males|boys/.test(text);
-}
-
-function extractTotal(text) {
-    let nMatch = text.match(/n\s*=\s*(\d+)/);
-    if (nMatch) return parseInt(nMatch[1]);
-
-    let totalMatch = text.match(/(\d+)\s*(participants|subjects|individuals)/);
-    if (totalMatch) return parseInt(totalMatch[1]);
-
-    return null;
-}
-
-function extractFemaleCount(text) {
-    let femaleMatch = text.match(/(\d+)\s*(women|woman|female|females|girls)/);
-    if (femaleMatch) return parseInt(femaleMatch[1]);
-
-    return null;
-}
-
-function extractFemalePercent(text) {
-    let percentMatch = text.match(/(\d+)\s*%\s*(female|women|girls)/);
-    if (percentMatch) return parseFloat(percentMatch[1]);
-
-    return null;
-}
-
-function analyzeText(text) {
-
-    const total = extractTotal(text);
-    const femaleCount = extractFemaleCount(text);
-    const directPercent = extractFemalePercent(text);
-    const genderMentioned = detectGenderMention(text);
-
-    let femalePercentage = null;
-
-    if (directPercent !== null) {
-        femalePercentage = directPercent;
-    } 
-    else if (total !== null && femaleCount !== null) {
-        femalePercentage = (femaleCount / total) * 100;
-    }
-
-    return {
-        femalePercentage,
-        genderMentioned,
-        totalParticipants: total,
-        femaleCount: femaleCount
-    };
-}
-
+// Reset & Analyze
 async function checkPaper() {
 
     const fileInput = document.getElementById("fileInput");
     const result = document.getElementById("result");
+    const chartCanvas = document.getElementById("resultChart");
 
-// Reset previous chart
-if (chartInstance) {
-    chartInstance.destroy();
-    chartInstance = null;
-}
+    // Reset previous chart
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
 
-// Hide chart until needed
-document.getElementById("resultChart").style.display = "none";
-
+    chartCanvas.style.display = "none";
 
     if (!fileInput.files.length) {
         result.innerText = "Please upload a PDF file.";
@@ -174,58 +159,94 @@ document.getElementById("resultChart").style.display = "none";
     result.innerText = "Analyzing paper...";
 
     const fullText = await extractTextFromPDF(fileInput.files[0]);
-    const methodsSection = extractMethodsSection(fullText);
+    const analysis = analyzeText(fullText);
 
-    let analysis = methodsSection ? analyzeText(methodsSection) : null;
-
-    if (!analysis || analysis.femalePercentage === null) {
-        analysis = analyzeText(fullText);
-    }
     if (analysis.femalePercentage !== null) {
 
         const percentage = analysis.femalePercentage.toFixed(2);
-        const totalParticipants = analysis.totalParticipants;
+        const total = analysis.totalParticipants;
+        const femaleCount = analysis.femaleCount || Math.round((analysis.femalePercentage / 100) * total);
+        const maleCount = total - femaleCount;
 
-        let femaleCount;
-
-        if (analysis.femaleCount !== null) {
-            femaleCount = analysis.femaleCount;
-        } else {
-            femaleCount = Math.round((analysis.femalePercentage / 100) * totalParticipants);
-        }
-
-        const maleCount = totalParticipants - femaleCount;
-
-document.getElementById("resultChart").style.display = "block";
+        chartCanvas.style.display = "block";
         renderChart(femaleCount, maleCount);
 
         const status = analysis.femalePercentage >= REPRESENTATION_THRESHOLD
-            ? "Accurate Representation ✅"
-            : "Underrepresentation ❌";
+            ? "Accurate Representation"
+            : "Underrepresentation";
 
         result.innerText =
             "Female Representation: " + percentage + "%\n" +
             status;
     }
-
-    else if (analysis.genderMentioned) {
-        result.innerText = "Number of females in study not specified.";
-    }
-
     else {
         result.innerText = "Female representation not specified in this paper.";
     }
 }
 
-// -------- RENDER PIE CHART --------
+// PDF extraction
+async function extractTextFromPDF(file) {
+    const reader = new FileReader();
+
+    return new Promise((resolve, reject) => {
+        reader.onload = async function() {
+            const typedarray = new Uint8Array(this.result);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+            let text = "";
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                text += content.items.map(item => item.str).join(" ");
+            }
+
+            resolve(text.toLowerCase());
+        };
+
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+// Simple analysis
+function analyzeText(text) {
+
+    let percentMatch = text.match(/(\d+)\s*%\s*(female|women|girls)/);
+    let totalMatch = text.match(/n\s*=\s*(\d+)/);
+    let femaleMatch = text.match(/(\d+)\s*(female|women|girls)/);
+
+    let femalePercentage = null;
+    let totalParticipants = null;
+    let femaleCount = null;
+
+    if (percentMatch) {
+        femalePercentage = parseFloat(percentMatch[1]);
+    }
+
+    if (totalMatch) {
+        totalParticipants = parseInt(totalMatch[1]);
+    }
+
+    if (femaleMatch) {
+        femaleCount = parseInt(femaleMatch[1]);
+    }
+
+    if (!femalePercentage && totalParticipants && femaleCount) {
+        femalePercentage = (femaleCount / totalParticipants) * 100;
+    }
+
+    return {
+        femalePercentage,
+        totalParticipants,
+        femaleCount
+    };
+}
+
+// Chart rendering
 function renderChart(femaleCount, maleCount) {
 
     const ctx = document.getElementById('resultChart').getContext('2d');
     const total = femaleCount + maleCount;
-
-    if (chartInstance) {
-        chartInstance.destroy();
-    }
 
     chartInstance = new Chart(ctx, {
         type: 'pie',
@@ -238,18 +259,11 @@ function renderChart(femaleCount, maleCount) {
         },
         options: {
             plugins: {
-                legend: {
-                    position: 'bottom'
-                },
+                legend: { position: 'bottom' },
                 datalabels: {
-                    formatter: (value) => {
-                        let percentage = (value / total * 100).toFixed(1);
-                        return percentage + '%';
-                    },
+                    formatter: (value) => ((value / total) * 100).toFixed(1) + '%',
                     color: '#fff',
-                    font: {
-                        weight: 'bold'
-                    }
+                    font: { weight: 'bold' }
                 }
             }
         },
