@@ -137,8 +137,59 @@
 const REPRESENTATION_THRESHOLD = 45;
 let chartInstance = null;
 Chart.register(ChartDataLabels);
+Chart.register({
+    id: 'connectorLine',
+    afterDatasetsDraw(chart) {
 
+        const { ctx, chartArea } = chart;
+        const dataset = chart.data.datasets[0];
+        const meta = chart.getDatasetMeta(0);
+        const total = dataset.data.reduce((a, b) => a + b, 0);
 
+        meta.data.forEach((element, index) => {
+
+            const value = dataset.data[index];
+            const percentage = (value / total) * 100;
+
+            if (percentage <= 3) {
+
+                // Start from right edge of pie and subtract
+                const startX = element.x + element.outerRadius -110;
+                
+                // Slightly above center (adjust this number if needed)
+                const startY = element.y + -60;
+
+                // End of horizontal line (longer to the right)
+                const endX = startX + 102.9;
+                const endY = startY;
+
+                ctx.save();
+
+                // Draw horizontal line
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = '#94A3B8';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw percentage at end
+                ctx.font = 'bold 14px Arial';
+                ctx.fillStyle = '#94A3B8';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+
+                ctx.fillText(
+                    percentage.toFixed(1) + '%',
+                    endX + 6,
+                    endY
+                );
+
+                ctx.restore();
+            }
+        });
+    }
+});
 
 // Reset & Analyze
 async function checkPaper() {
@@ -259,8 +310,8 @@ function renderChart(femaleCount, maleCount) {
             datasets: [{
                 data: [femaleCount, maleCount],
                 backgroundColor: [
-                    '#5B8DBA',  // Female - medium blue
-                    '#8FB7DC'   // Male - lighter blue
+                    '#5B8DBA',
+                    '#8FB7DC'
                 ],
                 borderColor: '#ffffff',
                 borderWidth: 3,
@@ -280,21 +331,56 @@ function renderChart(femaleCount, maleCount) {
                     position: 'bottom',
                     labels: {
                         color: '#333',
-                        font: {
-                            size: 14
-                        }
+                        font: { size: 14 }
                     }
                 },
+
                 datalabels: {
-                    formatter: (value) => ((value / total) * 100).toFixed(1) + '%',
-                    color: '#ffffff',
-                    font: { weight: 'bold', size: 14 }
+
+                    formatter: (value, context) => {
+    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+    const percentage = (value / total) * 100;
+
+    if (percentage <= 3) return null;
+
+    return percentage.toFixed(1) + "%";
+},
+
+                    color: (context) => {
+                        const value = context.dataset.data[context.dataIndex];
+                        const percentage = (value / total) * 100;
+                        return percentage <= 3 ? '#1f2937' : '#ffffff';
+                    },
+
+                    font: {
+                        weight: 'bold',
+                        size: 14
+                    },
+
+                    anchor: (context) => {
+                        const value = context.dataset.data[context.dataIndex];
+                        const percentage = (value / total) * 100;
+                        return percentage <= 3 ? 'end' : 'center';
+                    },
+
+                    align: (context) => {
+                        const value = context.dataset.data[context.dataIndex];
+                        const percentage = (value / total) * 100;
+                        return percentage <= 3 ? 'right' : 'center';
+                    },
+
+                    offset: (context) => {
+                        const value = context.dataset.data[context.dataIndex];
+                        const percentage = (value / total) * 100;
+                        return percentage <= 3 ? 45 : 0;
+                    },
+
+                    clamp: true
                 }
             }
         },
-     
 
-
+        
     });
 }
 
