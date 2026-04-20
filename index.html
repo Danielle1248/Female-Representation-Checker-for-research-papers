@@ -219,12 +219,14 @@ async function checkPaper() {
     if (analysis.femalePercentage !== null) {
 
         const percentage = analysis.femalePercentage.toFixed(2);
-        const total = analysis.totalParticipants;
-        const femaleCount = analysis.femaleCount || Math.round((analysis.femalePercentage / 100) * total);
-        const maleCount = total - femaleCount;
+        const total = analysis.totalParticipants || 0;
+        const femaleCount = analysis.femaleCount ?? Math.round((analysis.femalePercentage / 100) * total);
+        const maleCount = analysis.maleCount ?? Math.max(total - femaleCount, 0);
 
-        chartCanvas.style.display = "block";
-        renderChart(femaleCount, maleCount);
+        if (femaleCount !== null && maleCount !== null) {
+            chartCanvas.style.display = "block";
+            renderChart(femaleCount, maleCount);
+        }
 
         const status = analysis.femalePercentage >= REPRESENTATION_THRESHOLD
             ? "Accurate Representation"
@@ -266,13 +268,19 @@ async function extractTextFromPDF(file) {
 // Simple analysis
 function analyzeText(text) {
 
-    let percentMatch = text.match(/(\d+)\s*%\s*(female|women|girls)/);
-    let totalMatch = text.match(/n\s*=\s*(\d+)/);
-    let femaleMatch = text.match(/(\d+)\s*(female|women|girls)/);
+    const normalizedText = text.replace(/\s+/g, " ");
+
+    const percentMatch = normalizedText.match(/(\d+(?:\.\d+)?)\s*%\s*(female|women|girls)/);
+    const totalMatch =
+        normalizedText.match(/\b(?:total|overall|sample size)\s*(?:participants?|subjects?|rats?|mice|animals?)?\s*[:=]?\s*(\d+)\b/) ||
+        normalizedText.match(/\bn\s*=\s*(\d+)\b/);
+    const femaleMatch = normalizedText.match(/\b(?:females?|women|girls)\s*[:=]?\s*(\d+)\b|\b(\d+)\s*(female|women|girls)\b/);
+    const maleMatch = normalizedText.match(/\b(?:males?|men|boys)\s*[:=]?\s*(\d+)\b|\b(\d+)\s*(male|men|boys)\b/);
 
     let femalePercentage = null;
     let totalParticipants = null;
     let femaleCount = null;
+    let maleCount = null;
 
     if (percentMatch) {
         femalePercentage = parseFloat(percentMatch[1]);
@@ -283,17 +291,34 @@ function analyzeText(text) {
     }
 
     if (femaleMatch) {
-        femaleCount = parseInt(femaleMatch[1]);
+        femaleCount = parseInt(femaleMatch[1] || femaleMatch[2], 10);
     }
 
-    if (!femalePercentage && totalParticipants && femaleCount) {
+    if (maleMatch) {
+        maleCount = parseInt(maleMatch[1] || maleMatch[2], 10);
+    }
+
+    if (!totalParticipants && femaleCount !== null && maleCount !== null) {
+        totalParticipants = femaleCount + maleCount;
+    }
+
+    if (totalParticipants && femaleCount === null && maleCount !== null) {
+        femaleCount = totalParticipants - maleCount;
+    }
+
+    if (totalParticipants && maleCount === null && femaleCount !== null) {
+        maleCount = totalParticipants - femaleCount;
+    }
+
+    if (totalParticipants && femaleCount !== null) {
         femalePercentage = (femaleCount / totalParticipants) * 100;
     }
 
     return {
         femalePercentage,
         totalParticipants,
-        femaleCount
+        femaleCount,
+        maleCount
     };
 }
 
